@@ -1,0 +1,20 @@
+[Unit]
+# GPU clock cap 0-2000MHz — GB10 longevity + thermal stability.
+# Sep 6 2026: under sustained render load one of our boxes went 83-86C/2203-2411MHz/70-80W ->
+# 75C/1976MHz/46W within seconds of the cap. Cost: none visible on memory-bound LLM decode,
+# ~30% on a compute-bound bf16 matmul (one sample). See the README section 3.
+# Install: cp to /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now gpu-clock-cap
+# Revert anytime: sudo nvidia-smi -rgc && sudo systemctl disable gpu-clock-cap
+Description=Cap GPU SM clocks at 2000MHz (thermal/longevity)
+# NO After=/Wants=multi-user.target: with WantedBy=multi-user.target that is an ORDERING CYCLE
+# (a target is ordered after the units it wants), and systemd breaks a cycle by dropping a job, maybe this one.
+# Found Oct 7 2026; the box had never rebooted since the Sep 6 manual enable, so the boot path was unproven.
+After=nvidia-persistenced.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nvidia-smi -lgc 0,2000
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
